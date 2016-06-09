@@ -90,20 +90,20 @@ void setup(void) {
 	Serial.begin(115200);
 
 	pinMode(LED_PWM, OUTPUT);
-	analogWrite(LED_PWM, 70);
+	analogWrite(LED_PWM, 0);
 
 	pinMode(SWITCH, INPUT);
 	digitalWrite(SWITCH, HIGH);
 
 	lid.attach(LID_SERVO);
 	lid.write(LID_MIN_VALUE);
-	lid.refresh();
+//	lid.refresh();
 
 	arm.attach(ARM_SERVO);
 	arm.write(ARM_MIN_VALUE);
-	arm.refresh();
+//	arm.refresh();
 
-	// Use this initializer (uncomment) if you're using a 1.44" TFT
+// Use this initializer (uncomment) if you're using a 1.44" TFT
 	tft.initR(INITR_144GREENTAB);
 
 	Serial.print("Initializing SD card...");
@@ -127,7 +127,7 @@ void setup(void) {
 SimpleBehaviour simple = SimpleBehaviour();
 FastBehaviour fast = FastBehaviour();
 
-Strategy *strategies[] = {&fast, &simple};
+Strategy *strategies[] = { &fast, &simple };
 const int numStrategies = 2;
 int currentStrategy = 0;
 
@@ -163,8 +163,6 @@ void loop() {
 			strategy = NULL;
 		}
 	}
-
-
 
 //	if (action != Action::end && action != Action::hold) {
 //		lid.refresh();

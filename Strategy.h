@@ -18,8 +18,6 @@
 class Strategy {
 public:
 
-
-
 	/**
 	 * Sequence of positions and pwm at the end of period
 	 */
@@ -41,12 +39,19 @@ public:
 	/**
 	 * Set servos to the strategy
 	 */
-	void setServos(Adafruit_SoftServo *lid_, Adafruit_SoftServo *arm_) {lid=lid_; arm=arm_;};
+	void setServos(Adafruit_SoftServo *lid_, Adafruit_SoftServo *arm_) {
+		lid = lid_;
+		arm = arm_;
+	}
+	;
 
 	/**
 	 * Set pwm pin for backlight
 	 */
-	void setPwmPin(int pin) {pwmPin = pin;};
+	void setPwmPin(int pin) {
+		pwmPin = pin;
+	}
+	;
 
 	/**
 	 * execute behaviour
@@ -68,9 +73,16 @@ protected:
 
 	int pwmPin;
 
+//	const Strategy::SequenceStep *sequence;
+//
+//	const int stepCount;
+//	int step;
+//	unsigned long startTime;
 
 	Action action;
-
+	int lidStart;
+	int armStart;
+	int pwmStart;
 	int lidPos;
 	int armPos;
 	int pwmPos;

@@ -7,8 +7,8 @@
 
 #include "SimpleBehaviour.h"
 
-
-SimpleBehaviour::SimpleBehaviour() : step(0), startTime(0) {
+SimpleBehaviour::SimpleBehaviour() :
+		step(0), startTime(0) {
 }
 
 SimpleBehaviour::~SimpleBehaviour() {
@@ -21,29 +21,38 @@ bool SimpleBehaviour::execute(bool abort) {
 	unsigned long currentTime = millis();
 
 	if (step == 0) {
-		Serial.print("Simple begin < ");
-		lidPos = sequence[step].lidAngle;
-		armPos = sequence[step].armAngle;
-		pwmPos = sequence[step].pwmValue;
+		Serial.print("Fast begin < 0 ");
 
-		writePwmPin(pwmPos);
-		lid->write(lidPos);
-		arm->write(armPos);
+		lidStart = sequence[step].lidAngle;
+		armStart = sequence[step].armAngle;
+		pwmStart = sequence[step].pwmValue;
+
+		writePwmPin(pwmStart);
+		lid->write(lidStart);
+		arm->write(armStart);
 
 		while (millis() < currentTime + sequence[step].delay) {
 			arm->refresh();
 			lid->refresh();
 			delay(20);
 		}
-		startTime = millis();
+
 		step++;
+
+		lidPos = sequence[step].lidAngle;
+		armPos = sequence[step].armAngle;
+		pwmPos = sequence[step].pwmValue;
+
+		startTime = millis();
+
 	} else {
 		unsigned long phase = millis() - startTime;
+		int duration = sequence[step].duration;
 
 		if (phase < sequence[step].duration) {
-			int pwmValue = pwmPos + ((sequence[step].pwmValue - pwmPos) * phase) / sequence[step].duration;
-			int lidValue = lidPos + ((sequence[step].lidAngle - lidPos) * phase) / sequence[step].duration;
-			int armValue = armPos + ((sequence[step].armAngle - armPos) * phase) / sequence[step].duration;
+			int pwmValue = map(phase, 0, duration, pwmStart, pwmPos);
+			int lidValue = map(phase, 0, duration, lidStart, lidPos);
+			int armValue = map(phase, 0, duration, armStart, armPos);
 
 			writePwmPin(pwmValue);
 			lid->write(lidValue);
@@ -52,24 +61,36 @@ bool SimpleBehaviour::execute(bool abort) {
 			arm->refresh();
 
 		} else if (phase < (sequence[step].duration + sequence[step].delay)) {
-			writePwmPin(sequence[step].pwmValue);
-			lid->write(sequence[step].lidAngle);
-			arm->write(sequence[step].armAngle);
+			writePwmPin(pwmPos);
+			lid->write(lidPos);
+			arm->write(armPos);
 			lid->refresh();
 			arm->refresh();
 		} else {
-			pwmPos = sequence[step].pwmValue;
-			lidPos = sequence[step].lidAngle;
-			armPos = sequence[step].armAngle;
+			writePwmPin(pwmPos);
+			lid->write(lidPos);
+			arm->write(armPos);
+			lid->refresh();
+			arm->refresh();
 
+			lidStart = sequence[step].lidAngle;
+			armStart = sequence[step].armAngle;
+			pwmStart = sequence[step].pwmValue;
+
+			Serial.print(step);
+			Serial.print(" ");
+
+			startTime = millis();
 			step++;
 			if (step >= stepCount) {
 				step = 0;
 				complete = true;
 				Serial.println(">");
 			} else {
-				Serial.print(step);
-				Serial.print(" ");
+				pwmPos = sequence[step].pwmValue;
+				lidPos = sequence[step].lidAngle;
+				armPos = sequence[step].armAngle;
+
 			}
 
 		}
