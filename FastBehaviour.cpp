@@ -7,10 +7,8 @@
 
 #include "FastBehaviour.h"
 
-const int LID_SPEED = 20;
-const int ARM_SPEED = 30;
 
-FastBehaviour::FastBehaviour() {
+FastBehaviour::FastBehaviour() : step(0), startTime(0) {
 	// TODO Auto-generated constructor stub
 
 }
@@ -21,56 +19,62 @@ FastBehaviour::~FastBehaviour() {
 
 bool FastBehaviour::execute(bool abort) {
 	bool complete = false;
+		unsigned long currentTime = millis();
 
-	switch (action) {
-	case Action::hold:
-		action = Action::open;
-		break;
+		if (step == 0) {
+			Serial.print("Fast begin < ");
+			lidPos = sequence[step].lidAngle;
+			armPos = sequence[step].armAngle;
+			pwmPos = sequence[step].pwmValue;
 
-	case Action::open:
-		if (lidPos < lid->getMaxValue()) {
-			lidPos += LID_SPEED;
+			writePwmPin(pwmPos);
 			lid->write(lidPos);
-			//			lid.refresh();
-		} else {
-			action = Action::out;
-		}
-		break;
-
-	case Action::out:
-		if (armPos < arm->getMaxValue()) {
-			armPos += ARM_SPEED;
 			arm->write(armPos);
-			//			arm.refresh();
+
+			while (millis() < currentTime + sequence[step].delay) {
+				arm->refresh();
+				lid->refresh();
+				delay(20);
+			}
+			startTime = millis();
+			step++;
 		} else {
-			action = Action::in;
+			unsigned long phase = millis() - startTime;
+
+			if (phase < sequence[step].duration) {
+				int pwmValue = pwmPos + ((sequence[step].pwmValue - pwmPos) * phase) / sequence[step].duration;
+				int lidValue = lidPos + ((sequence[step].lidAngle - lidPos) * phase) / sequence[step].duration;
+				int armValue = armPos + ((sequence[step].armAngle - armPos) * phase) / sequence[step].duration;
+
+				writePwmPin(pwmValue);
+				lid->write(lidValue);
+				arm->write(armValue);
+				lid->refresh();
+				arm->refresh();
+
+			} else if (phase < (sequence[step].duration + sequence[step].delay)) {
+				writePwmPin(sequence[step].pwmValue);
+				lid->write(sequence[step].lidAngle);
+				arm->write(sequence[step].armAngle);
+				lid->refresh();
+				arm->refresh();
+			} else {
+				pwmPos = sequence[step].pwmValue;
+				lidPos = sequence[step].lidAngle;
+				armPos = sequence[step].armAngle;
+
+				step++;
+				if (step >= stepCount) {
+					step = 0;
+					complete = true;
+					Serial.println(">");
+				} else {
+					Serial.print(step);
+					Serial.print(" ");
+				}
+
+			}
 		}
-		break;
 
-	case Action::in:
-		if (armPos > arm->getMinValue()) {
-			armPos -= ARM_SPEED;
-			arm->write(armPos);
-			//			arm.refresh();
-		} else {
-			action = Action::close;
-		}
-		break;
-
-	case Action::close:
-		if (lidPos > lid->getMinValue()) {
-			lidPos -= LID_SPEED;
-			lid->write(lidPos);
-			//			lid.refresh();
-		} else {
-			action = Action::hold;
-			complete = true;
-		}
-		break;
-	}
-
-	lid->refresh();
-	arm->refresh();
-
-	return complete;
+		return complete;
 }

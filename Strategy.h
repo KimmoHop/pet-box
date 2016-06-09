@@ -8,7 +8,7 @@
 #ifndef STRATEGY_H_
 #define STRATEGY_H_
 
-#include "LimitedServo.h"
+#include "Adafruit_SoftServo.h"
 
 #define ARM_MIN_VALUE  30
 #define ARM_MAX_VALUE  150
@@ -41,7 +41,12 @@ public:
 	/**
 	 * Set servos to the strategy
 	 */
-	void setServos(LimitedServo *lid_, LimitedServo *arm_) {lid=lid_; arm=arm_;};
+	void setServos(Adafruit_SoftServo *lid_, Adafruit_SoftServo *arm_) {lid=lid_; arm=arm_;};
+
+	/**
+	 * Set pwm pin for backlight
+	 */
+	void setPwmPin(int pin) {pwmPin = pin;};
 
 	/**
 	 * execute behaviour
@@ -52,15 +57,23 @@ public:
 	virtual bool execute(bool abort) = 0;
 
 protected:
-	LimitedServo *lid;
-	LimitedServo *arm;
 
+	/**
+	 * Set pwm value
+	 */
+	void writePwmPin(int value);
+
+	Adafruit_SoftServo *lid;
+	Adafruit_SoftServo *arm;
+
+	int pwmPin;
 
 
 	Action action;
 
 	int lidPos;
 	int armPos;
+	int pwmPos;
 
 };
 

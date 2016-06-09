@@ -26,7 +26,7 @@
 #include <SPI.h>
 #include <SD.h>
 //#include <Servo.h>
-//#include <Adafruit_SoftServo.h>
+#include <Adafruit_SoftServo.h>
 
 #include "LimitedServo.h"
 #include "Strategy.h"
@@ -53,11 +53,11 @@
 
 #define SWITCH     7
 
-const int ARM_HIGH = 150;
-const int ARM_LOW = 30;
-
-const int LID_HIGH = 150;
-const int LID_LOW = 30;
+//const int ARM_HIGH = 150;
+//const int ARM_LOW = 30;
+//
+//const int LID_HIGH = 150;
+//const int LID_LOW = 30;
 
 enum Action {
 	hold = 0, open, out, in, close, end
@@ -76,12 +76,12 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 //Servo arm = Servo();
 Adafruit_SoftServo lid, arm;
 
-LimitedServo lidServo = LimitedServo(&lid, LID_LOW, LID_HIGH);
-LimitedServo armServo = LimitedServo(&arm, ARM_LOW, ARM_HIGH);
+//LimitedServo lidServo = LimitedServo(&lid, LID_LOW, LID_HIGH);
+//LimitedServo armServo = LimitedServo(&arm, ARM_LOW, ARM_HIGH);
 
-Action action = hold;
-int armPos = 30;
-int lidPos = 30;
+//Action action = hold;
+//int armPos = 30;
+//int lidPos = 30;
 
 const int SERVO_COOL_TIME = 50;
 int servoCoolTime = SERVO_COOL_TIME;
@@ -95,13 +95,13 @@ void setup(void) {
 	pinMode(SWITCH, INPUT);
 	digitalWrite(SWITCH, HIGH);
 
-	lidServo.attach(LID_SERVO);
-	lidServo.write(lidPos);
-	lidServo.refresh();
+	lid.attach(LID_SERVO);
+	lid.write(LID_MIN_VALUE);
+	lid.refresh();
 
-	armServo.attach(ARM_SERVO);
-	armServo.write(armPos);
-	armServo.refresh();
+	arm.attach(ARM_SERVO);
+	arm.write(ARM_MIN_VALUE);
+	arm.refresh();
 
 	// Use this initializer (uncomment) if you're using a 1.44" TFT
 	tft.initR(INITR_144GREENTAB);
@@ -127,7 +127,7 @@ void setup(void) {
 SimpleBehaviour simple = SimpleBehaviour();
 FastBehaviour fast = FastBehaviour();
 
-Strategy *strategies[] = {&simple, &fast};
+Strategy *strategies[] = {&fast, &simple};
 const int numStrategies = 2;
 int currentStrategy = 0;
 
@@ -138,13 +138,15 @@ void loop() {
 
 	if (strategy == NULL) {
 		if (digitalRead(SWITCH) == 0) {
+			Serial.print("Starting...");
 			// Start sequence
 			strategy = strategies[currentStrategy];
 			currentStrategy++;
 			if (currentStrategy >= numStrategies) {
 				currentStrategy = 0;
 			}
-			strategy->setServos(&lidServo, &armServo);
+			strategy->setServos(&lid, &arm);
+			strategy->setPwmPin(LED_PWM);
 			strategy->execute(false);
 		} else if (servoCoolTime > 0) {
 			servoCoolTime--;
@@ -155,20 +157,20 @@ void loop() {
 		bool abort = false;
 		// Run untill finished, then stop
 		if (strategy->execute(abort) == true) {
-			lid.write(LID_LOW);
-			arm.write(ARM_LOW);
-			servoCoolTime = SERVO_COOL_TIME;
+//			lid.write(LID_LOW);
+//			arm.write(ARM_MIN_VALUE);
+//			servoCoolTime = SERVO_COOL_TIME;
 			strategy = NULL;
 		}
 	}
 
 
 
-	if (action != Action::end && action != Action::hold) {
-		lid.refresh();
-		arm.refresh();
-	}
-
+//	if (action != Action::end && action != Action::hold) {
+//		lid.refresh();
+//		arm.refresh();
+//	}
+//
 	unsigned long end = millis();
 	if ((start > end) && (LOOP_DELAY + end > 20)) {
 		delay(LOOP_DELAY);
