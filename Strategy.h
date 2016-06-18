@@ -16,6 +16,12 @@
 #define LID_MAX_VALUE  150
 #define SEQ_END -1
 
+#define LIDANGLE 0
+#define ARMANGLE 1
+#define PWMVALUE 2
+#define DURATION 3
+#define DELAYAFTER 4
+
 class Strategy {
 public:
 
@@ -27,12 +33,12 @@ public:
 		int armAngle; /// arm servo angle after duration
 		int pwmValue; /// backlight brightness after duration
 		int duration; /// time to move to end values
-		int delay; /// time after move before next step
+		int delayAfter; /// time after move before next step
 	};
 
-	enum Action {
-		hold = 0, open, out, in, close, end
-	};
+//	enum Action {
+//		hold = 0, open, out, in, close, end
+//	};
 
 	Strategy();
 	virtual ~Strategy();
@@ -74,8 +80,9 @@ protected:
 
 	int pwmPin;
 
-	virtual int getStepCount() = 0;
-	virtual const void * getSequenceAddress() = 0;
+//	virtual int getStepCount() = 0;
+//	virtual const Strategy::SequenceStep * getSequenceAddress() = 0;
+	virtual int getSequenceValue(int step, int index) = 0;
 
 //	const Strategy::SequenceStep *sequence;
 //
@@ -83,13 +90,15 @@ protected:
 //	int step;
 //	unsigned long startTime;
 
-	Action action;
+//	Action action;
 	int lidStart;
 	int armStart;
 	int pwmStart;
 	int lidPos;
 	int armPos;
 	int pwmPos;
+	int duration;
+	int delayAfter;
 
 	int step;
 	unsigned long startTime;

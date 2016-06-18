@@ -18,24 +18,8 @@ public:
 //	virtual bool execute(bool abort);
 
 protected:
-	virtual const void * getSequenceAddress() {return &sequence[0];};
-	virtual int getStepCount() {return 9;};
+	virtual int getSequenceValue(int step, int index);
 
-	const Strategy::SequenceStep sequence[10] = {
-			{LID_MIN_VALUE, ARM_MIN_VALUE, 20, 0, 0}, // initial position
-			{LID_MAX_VALUE, ARM_MIN_VALUE, 150, 500, 0},
-			{LID_MAX_VALUE, ARM_MAX_VALUE - 50, 150, 500, 500},
-			{LID_MAX_VALUE, ARM_MAX_VALUE, 150, 200, 200},
-			{LID_MAX_VALUE, ARM_MIN_VALUE, 150, 500, 0},
-			{LID_MIN_VALUE, ARM_MIN_VALUE, 20, 500, 1000},
-			{LID_MIN_VALUE + 30, ARM_MIN_VALUE, 50, 1000, 1000},
-			{LID_MIN_VALUE, ARM_MIN_VALUE, 20, 1000, 500}, // close position
-			{LID_MIN_VALUE, ARM_MIN_VALUE, 0, 0, 0}, // lights off
-			{SEQ_END, SEQ_END, 0, 0, 0}
-	};;
-	const int stepCount = 9;
-	int step;
-	unsigned long startTime;
 };
 
 #endif /* SIMPLEBEHAVIOUR_H_ */
