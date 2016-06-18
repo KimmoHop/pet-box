@@ -14,6 +14,7 @@
 #define ARM_MAX_VALUE  150
 #define LID_MIN_VALUE  30
 #define LID_MAX_VALUE  150
+#define SEQ_END -1
 
 class Strategy {
 public:
@@ -59,7 +60,7 @@ public:
 	 * abort true if switch set while running
 	 * return true when complete
 	 */
-	virtual bool execute(bool abort) = 0;
+	virtual bool execute(bool abort);
 
 protected:
 
@@ -72,6 +73,9 @@ protected:
 	Adafruit_SoftServo *arm;
 
 	int pwmPin;
+
+	virtual int getStepCount() = 0;
+	virtual const void * getSequenceAddress() = 0;
 
 //	const Strategy::SequenceStep *sequence;
 //
@@ -86,6 +90,9 @@ protected:
 	int lidPos;
 	int armPos;
 	int pwmPos;
+
+	int step;
+	unsigned long startTime;
 
 };
 
