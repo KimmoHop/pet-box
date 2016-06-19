@@ -64,6 +64,7 @@ enum Action {
 };
 
 void bmpDraw(char *filename, uint8_t x, uint8_t y);
+void bmpDraw(File &bmpFile, uint8_t x, uint8_t y);
 uint16_t read16(File f);
 uint32_t read32(File f);
 
@@ -75,6 +76,14 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 //Servo lid = Servo();
 //Servo arm = Servo();
 Adafruit_SoftServo lid, arm;
+
+
+File root;
+File bitmap;
+int bitmapCount = 0;
+int currentBitmap = 0;
+int readBitmapCount();
+boolean selectBitmap(int index);
 
 //LimitedServo lidServo = LimitedServo(&lid, LID_LOW, LID_HIGH);
 //LimitedServo armServo = LimitedServo(&arm, ARM_LOW, ARM_HIGH);
@@ -106,15 +115,39 @@ void setup(void) {
 // Use this initializer (uncomment) if you're using a 1.44" TFT
 	tft.initR(INITR_144GREENTAB);
 
-	Serial.print("Initializing SD card...");
+	Serial.print(F("Initializing SD card..."));
 	if (!SD.begin(SD_CS)) {
-		Serial.println("failed!");
+		Serial.println(F("failed!"));
 		return;
 	}
-	Serial.println("OK!");
+	Serial.println(F("OK!"));
 
-	// change the name here!
-	bmpDraw("west.bmp", 0, 0);
+	root = SD.open("/");
+	bitmapCount = readBitmapCount();
+	Serial.print(bitmapCount);
+	Serial.println(F(" bitmap files found"));
+	if (bitmapCount == 0) {
+		Serial.println(F("failed!"));
+		return;
+	}
+
+	uint32_t seed = 0;  // Generate random see start
+	for (uint8_t i = 0 ; i < 10 ; i++) {
+		seed = (seed << 5) + (analogRead(0) * 3);
+	}
+	Serial.print(F("Random seed="));
+	Serial.println(seed);
+	randomSeed(seed);  //set random seed
+
+	// load first bitmap so that it is ready
+	currentBitmap = random(bitmapCount);
+	Serial.print(F("Next bitmap: "));
+	Serial.println(currentBitmap);
+	if (selectBitmap(currentBitmap)) {
+		Serial.println(bitmap.name());
+		bmpDraw(bitmap, 0, 0);
+		bitmap.close();
+	}
 	// wait 5 seconds
 	//delay(5000);
 
@@ -138,13 +171,14 @@ void loop() {
 
 	if (strategy == NULL) {
 		if (digitalRead(SWITCH) == 0) {
-			Serial.print("Starting...");
+			Serial.print(F("Starting sequence "));
+			Serial.print(currentStrategy);
+			Serial.println();
 			// Start sequence
 			strategy = strategies[currentStrategy];
-			currentStrategy++;
-			if (currentStrategy >= numStrategies) {
-				currentStrategy = 0;
-			}
+			// next strategy is random
+			currentStrategy = random(numStrategies);
+
 			strategy->setServos(&lid, &arm);
 			strategy->setPwmPin(LED_PWM);
 			strategy->execute(false);
@@ -157,32 +191,78 @@ void loop() {
 		bool abort = false;
 		// Run untill finished, then stop
 		if (strategy->execute(abort) == true) {
-//			lid.write(LID_LOW);
-//			arm.write(ARM_MIN_VALUE);
-//			servoCoolTime = SERVO_COOL_TIME;
 			strategy = NULL;
+			Serial.println();
+			Serial.print(F("Next sequence: "));
+			Serial.println(currentStrategy);
+			// load next bitmap
+			currentBitmap = random(bitmapCount);
+			Serial.print(F("Next bitmap: "));
+			Serial.println(currentBitmap);
+			if (selectBitmap(currentBitmap)) {
+				bmpDraw(bitmap, 0, 0);
+				bitmap.close();
+			}
 		}
 	}
 
-//	if (action != Action::end && action != Action::hold) {
-//		lid.refresh();
-//		arm.refresh();
-//	}
-//
 	unsigned long end = millis();
 	if ((start > end) && (LOOP_DELAY + end > 20)) {
 		delay(LOOP_DELAY);
 	} else {
 		delay(LOOP_DELAY + end - start);
 	}
-// uncomment these lines to draw bitmaps in different locations/rotations!
-	/*
-	 tft.fillScreen(ST7735_BLACK); // Clear display
-	 for(uint8_t i=0; i<4; i++)    // Draw 4 parrots
-	 bmpDraw("parrot.bmp", tft.width() / 4 * i, tft.height() / 4 * i);
-	 delay(1000);
-	 tft.setRotation(tft.getRotation() + 1); // Inc rotation 90 degrees
-	 */
+}
+
+
+bool isBmpFile(File &file) {
+	if (!file.isDirectory()) {
+		char *name = file.name();
+		int8_t len = strlen(name);
+		if (strstr(strlwr(name + (len - 4)), ".bmp")) {
+			return true;
+		}
+	}
+	return false;
+}
+
+int readBitmapCount() {
+	int count = 0;
+	root.rewindDirectory();
+	while (true) {
+		File entry = root.openNextFile();
+		if (!entry) {
+			break;
+		}
+		if (isBmpFile(entry)){
+			count++;
+		}
+		entry.close();
+	}
+
+	return count;
+}
+
+boolean selectBitmap(int index) {
+	root.rewindDirectory();
+	while (true) {
+		bitmap = root.openNextFile();
+		if (!bitmap) {
+			break;
+		}
+		if (isBmpFile(bitmap)){
+			if (index == 0) {
+				return true;
+			} else {
+				index--;
+				bitmap.close();
+			}
+		} else {
+			bitmap.close();
+		}
+	}
+
+	return false;
 }
 
 // This function opens a Windows Bitmap (BMP) file and
@@ -198,6 +278,25 @@ void loop() {
 void bmpDraw(char *filename, uint8_t x, uint8_t y) {
 
 	File bmpFile;
+
+
+	Serial.println();
+	Serial.print(F("Loading image '"));
+	Serial.print(filename);
+	Serial.println('\'');
+
+	// Open requested file on SD card
+	if ((bmpFile = SD.open(filename)) == NULL) {
+		Serial.print(F("File not found"));
+		return;
+	}
+
+	bmpDraw(bmpFile, x, y);
+
+	bmpFile.close();
+}
+
+void bmpDraw(File &bmpFile, uint8_t x, uint8_t y) {
 	int bmpWidth, bmpHeight;   // W+H in pixels
 	uint8_t bmpDepth;              // Bit depth (currently must be 24)
 	uint32_t bmpImageoffset;        // Start of image data in file
@@ -213,38 +312,27 @@ void bmpDraw(char *filename, uint8_t x, uint8_t y) {
 	if ((x >= TFT_WIDTH) || (y >= TFT_HEIGHT))
 		return;
 
-	Serial.println();
-	Serial.print("Loading image '");
-	Serial.print(filename);
-	Serial.println('\'');
-
-	// Open requested file on SD card
-	if ((bmpFile = SD.open(filename)) == NULL) {
-		Serial.print("File not found");
-		return;
-	}
-
 	// Parse BMP header
 	if (read16(bmpFile) == 0x4D42) { // BMP signature
-		Serial.print("File size: ");
+		Serial.print(F("File size: "));
 		Serial.println(read32(bmpFile));
 		(void) read32(bmpFile); // Read & ignore creator bytes
 		bmpImageoffset = read32(bmpFile); // Start of image data
-		Serial.print("Image Offset: ");
+		Serial.print(F("Image Offset: "));
 		Serial.println(bmpImageoffset, DEC);
 		// Read DIB header
-		Serial.print("Header size: ");
+		Serial.print(F("Header size: "));
 		Serial.println(read32(bmpFile));
 		bmpWidth = read32(bmpFile);
 		bmpHeight = read32(bmpFile);
 		if (read16(bmpFile) == 1) { // # planes -- must be '1'
 			bmpDepth = read16(bmpFile); // bits per pixel
-			Serial.print("Bit Depth: ");
+			Serial.print(F("Bit Depth: "));
 			Serial.println(bmpDepth);
 			if ((bmpDepth == 24) && (read32(bmpFile) == 0)) { // 0 = uncompressed
 
 				goodBmp = true; // Supported BMP format -- proceed!
-				Serial.print("Image size: ");
+				Serial.print(F("Image size: "));
 				Serial.print(bmpWidth);
 				Serial.print('x');
 				Serial.println(bmpHeight);
@@ -302,16 +390,15 @@ void bmpDraw(char *filename, uint8_t x, uint8_t y) {
 						tft.pushColor(tft.Color565(r, g, b));
 					} // end pixel
 				} // end scanline
-				Serial.print("Loaded in ");
+				Serial.print(F("Loaded in "));
 				Serial.print(millis() - startTime);
-				Serial.println(" ms");
+				Serial.println(F(" ms"));
 			} // end goodBmp
 		}
 	}
 
-	bmpFile.close();
 	if (!goodBmp)
-		Serial.println("BMP format not recognized.");
+		Serial.println(F("BMP format not recognized."));
 }
 
 // These read 16- and 32-bit types from the SD card file.

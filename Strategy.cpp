@@ -32,7 +32,7 @@ bool Strategy::execute(bool abort) {
 
 
 	if (step == 0) {
-		Serial.print("begin < 0 ");
+		Serial.print(F("Sequence begin < 0 "));
 
 		lidStart = getSequenceValue(step, LIDANGLE);
 		armStart = getSequenceValue(step, ARMANGLE);
@@ -40,9 +40,9 @@ bool Strategy::execute(bool abort) {
 		duration = getSequenceValue(step, DURATION);
 		delayAfter = getSequenceValue(step, DELAYAFTER);
 
-		Serial.print("(delay: ");
-		Serial.print(delayAfter);
-		Serial.print(")");
+//		Serial.print("(delay: ");
+//		Serial.print(delayAfter);
+//		Serial.print(")");
 		writePwmPin(pwmStart);
 		lid->write(lidStart);
 		arm->write(armStart);
@@ -60,11 +60,11 @@ bool Strategy::execute(bool abort) {
 		pwmPos = getSequenceValue(step, PWMVALUE);
 		duration = getSequenceValue(step, DURATION);
 		delayAfter = getSequenceValue(step, DELAYAFTER);
-		Serial.print("(lid: ");
-		Serial.print(lidStart);
-		Serial.print("->");
-		Serial.print(lidPos);
-		Serial.print(")");
+//		Serial.print("(lid: ");
+//		Serial.print(lidStart);
+//		Serial.print("->");
+//		Serial.print(lidPos);
+//		Serial.print(")");
 
 		startTime = millis();
 
@@ -100,7 +100,7 @@ bool Strategy::execute(bool abort) {
 			pwmStart = pwmPos;
 
 			Serial.print(step);
-			Serial.print(" ");
+			Serial.print(' ');
 
 			startTime = millis();
 			step++;
@@ -108,7 +108,7 @@ bool Strategy::execute(bool abort) {
 			if (getSequenceValue(step, LIDANGLE) == SEQ_END) {
 				step = 0;
 				complete = true;
-				Serial.println(">");
+				Serial.println('>');
 			} else {
 				lidPos = getSequenceValue(step, LIDANGLE);
 				armPos = getSequenceValue(step, ARMANGLE);
