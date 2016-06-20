@@ -1,25 +1,15 @@
 /***************************************************
- This is a library for the Adafruit 1.8" SPI display.
 
- This library works with the Adafruit 1.8" TFT Breakout w/SD card
- ----> http://www.adafruit.com/products/358
- The 1.8" TFT shield
- ----> https://www.adafruit.com/product/802
- The 1.44" TFT breakout
- ----> https://www.adafruit.com/product/2088
- as well as Adafruit raw 1.8" TFT display
- ----> http://www.adafruit.com/products/618
+Pet-box
 
- Check out the links above for our tutorials and wiring diagrams
- These displays use SPI to communicate, 4 or 5 pins are required to
- interface (RST is optional)
- Adafruit invests time and resources providing this open source code,
- please support Adafruit and open-source hardware by purchasing
- products from Adafruit!
+Most useless box with multiple behaviours and
+multiple faces using small TFT display, inspired by
+Don't touch box by Sally from Florence
+https://www.youtube.com/watch?v=tGCW8xftdOA
 
- Written by Limor Fried/Ladyada for Adafruit Industries.
- MIT license, all text above must be included in any redistribution
- ****************************************************/
+***************************************************/
+
+
 
 #include <Adafruit_GFX.h>    // Core graphics library
 #include <Adafruit_ST7735.h> // Hardware-specific library
@@ -32,6 +22,9 @@
 #include "Strategy.h"
 #include "SimpleBehaviour.h"
 #include "FastBehaviour.h"
+#include "AngryBehaviour.h"
+#include "SlowFastBehaviour.h"
+#include "SuspiciousBehaviour.h"
 
 // TFT display and SD card will share the hardware SPI interface.
 // Hardware SPI pins are specific to the Arduino board type and
@@ -40,41 +33,33 @@
 #define TFT_CS  10  // Chip select line for TFT display
 #define TFT_RST  9  // Reset line for TFT (or see below...)
 #define TFT_DC   8  // Data/command line for TFT
-
-#define SD_CS    4  // Chip select line for SD card
-
-#define LED_PWM  3
-
 #define TFT_WIDTH 128
 #define TFT_HEIGHT 128
+#define SD_CS    4  // Chip select line for SD card
 
-#define LID_SERVO  5
-#define ARM_SERVO  6
+#define LED_PWM  3 // pin for TFT backlight control
 
-#define SWITCH     7
+#define LID_SERVO  5 // pin for lid opening servo
+#define ARM_SERVO  6 // pin for switch arm servo
 
-//const int ARM_HIGH = 150;
-//const int ARM_LOW = 30;
-//
-//const int LID_HIGH = 150;
-//const int LID_LOW = 30;
+#define SWITCH     7 // pin for switch input
 
-enum Action {
-	hold = 0, open, out, in, close, end
-};
+#define LOOP_DELAY 20 // loop time for servo refresh
+#define SERVO_COOL_TIME 50 // number of loops to bring servos home
+
+
 
 void bmpDraw(char *filename, uint8_t x, uint8_t y);
 void bmpDraw(File &bmpFile, uint8_t x, uint8_t y);
 uint16_t read16(File f);
 uint32_t read32(File f);
 
-//Use this reset pin for the shield!
-//#define TFT_RST  0  // you can also connect this to the Arduino reset!
+int readBitmapCount();
+boolean selectBitmap(int index);
+
 
 Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 
-//Servo lid = Servo();
-//Servo arm = Servo();
 Adafruit_SoftServo lid, arm;
 
 
@@ -82,39 +67,51 @@ File root;
 File bitmap;
 int bitmapCount = 0;
 int currentBitmap = 0;
-int readBitmapCount();
-boolean selectBitmap(int index);
 
-//LimitedServo lidServo = LimitedServo(&lid, LID_LOW, LID_HIGH);
-//LimitedServo armServo = LimitedServo(&arm, ARM_LOW, ARM_HIGH);
+SimpleBehaviour simple = SimpleBehaviour();
+FastBehaviour fast = FastBehaviour();
+AngryBehaviour angry = AngryBehaviour();
+SlowFastBehaviour sf = SlowFastBehaviour();
+SuspiciousBehaviour suspicious = SuspiciousBehaviour();
 
-//Action action = hold;
-//int armPos = 30;
-//int lidPos = 30;
+Strategy *strategy = NULL;
+Strategy *strategies[] = { &fast, &simple, &angry, &sf, &suspicious };
+int numStrategies = sizeof(strategies) / sizeof(strategies[0]);
+int currentStrategy = 0;
 
-const int SERVO_COOL_TIME = 50;
 int servoCoolTime = SERVO_COOL_TIME;
+
 
 void setup(void) {
 	Serial.begin(115200);
 
+	Serial.println(F("Useless don't touch box"));
+	Serial.println();
+	Serial.print(F("with "));
+	Serial.print(numStrategies);
+	Serial.println(F(" behaviours"));
+	Serial.println();
+
+	delay(500);
+
+	// Pin setup
 	pinMode(LED_PWM, OUTPUT);
 	analogWrite(LED_PWM, 0);
 
 	pinMode(SWITCH, INPUT);
 	digitalWrite(SWITCH, HIGH);
 
+	// Servo setup
 	lid.attach(LID_SERVO);
-	lid.write(LID_MIN_VALUE);
-//	lid.refresh();
-
 	arm.attach(ARM_SERVO);
+	// cooling will drive servos home
+	lid.write(LID_MIN_VALUE);
 	arm.write(ARM_MIN_VALUE);
-//	arm.refresh();
 
-// Use this initializer (uncomment) if you're using a 1.44" TFT
+	// TFT setup
 	tft.initR(INITR_144GREENTAB);
 
+	// SD setup
 	Serial.print(F("Initializing SD card..."));
 	if (!SD.begin(SD_CS)) {
 		Serial.println(F("failed!"));
@@ -122,6 +119,17 @@ void setup(void) {
 	}
 	Serial.println(F("OK!"));
 
+	// Random seeding
+	uint32_t seed = 0;
+	for (uint8_t i = 0 ; i < 10 ; i++) {
+		seed = (seed << 5) + (analogRead(0) * 3);
+	}
+	Serial.print(F("Random seed="));
+	Serial.println(seed);
+	randomSeed(seed);
+
+	// Bitmaps setup
+	// open SD and read number of bitmap files
 	root = SD.open("/");
 	bitmapCount = readBitmapCount();
 	Serial.print(bitmapCount);
@@ -130,15 +138,6 @@ void setup(void) {
 		Serial.println(F("failed!"));
 		return;
 	}
-
-	uint32_t seed = 0;  // Generate random see start
-	for (uint8_t i = 0 ; i < 10 ; i++) {
-		seed = (seed << 5) + (analogRead(0) * 3);
-	}
-	Serial.print(F("Random seed="));
-	Serial.println(seed);
-	randomSeed(seed);  //set random seed
-
 	// load first bitmap so that it is ready
 	currentBitmap = random(bitmapCount);
 	Serial.print(F("Next bitmap: "));
@@ -148,23 +147,9 @@ void setup(void) {
 		bmpDraw(bitmap, 0, 0);
 		bitmap.close();
 	}
-	// wait 5 seconds
-	//delay(5000);
-
 }
 
-#define LID_SPEED 5
-#define ARM_SPEED 10
-#define LOOP_DELAY 20
 
-SimpleBehaviour simple = SimpleBehaviour();
-FastBehaviour fast = FastBehaviour();
-
-Strategy *strategies[] = { &fast, &simple };
-const int numStrategies = 2;
-int currentStrategy = 0;
-
-Strategy *strategy = NULL;
 
 void loop() {
 	unsigned long start = millis();
@@ -207,7 +192,8 @@ void loop() {
 	}
 
 	unsigned long end = millis();
-	if ((start > end) && (LOOP_DELAY + end > 20)) {
+
+	if ((start > end) && (LOOP_DELAY + end < 20)) {
 		delay(LOOP_DELAY);
 	} else {
 		delay(LOOP_DELAY + end - start);
