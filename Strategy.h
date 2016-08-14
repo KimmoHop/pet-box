@@ -10,10 +10,10 @@
 
 #include "Adafruit_SoftServo.h"
 
-#define ARM_MIN_VALUE  30
-#define ARM_MAX_VALUE  150
+#define ARM_MIN_VALUE  0
+#define ARM_MAX_VALUE  230
 #define LID_MIN_VALUE  30
-#define LID_MAX_VALUE  150
+#define LID_MAX_VALUE  180
 #define SEQ_END -1
 
 #define LIDANGLE 0

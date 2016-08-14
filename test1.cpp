@@ -26,6 +26,10 @@ https://www.youtube.com/watch?v=tGCW8xftdOA
 #include "SlowFastBehaviour.h"
 #include "SuspiciousBehaviour.h"
 
+template<class T> inline Print &operator <<(Print &obj, T arg) { obj.print(arg); return obj; }
+#define FS(x) (__FlashStringHelper*)(x)
+const char CRLF[]  PROGMEM  = { "\r\n" };
+
 // TFT display and SD card will share the hardware SPI interface.
 // Hardware SPI pins are specific to the Arduino board type and
 // cannot be remapped to alternate pins.  For Arduino Uno,
@@ -86,10 +90,7 @@ void setup(void) {
 	Serial.begin(115200);
 
 	Serial.println(F("Useless don't touch box"));
-	Serial.println();
-	Serial.print(F("with "));
-	Serial.print(numStrategies);
-	Serial.println(F(" behaviours"));
+	Serial << F("with ") << numStrategies << F(" behaviors") << FS(CRLF);
 	Serial.println();
 
 	delay(500);
@@ -124,24 +125,21 @@ void setup(void) {
 	for (uint8_t i = 0 ; i < 10 ; i++) {
 		seed = (seed << 5) + (analogRead(0) * 3);
 	}
-	Serial.print(F("Random seed="));
-	Serial.println(seed);
+	Serial << F("Random seed=") << seed << FS(CRLF);
 	randomSeed(seed);
 
 	// Bitmaps setup
 	// open SD and read number of bitmap files
 	root = SD.open("/");
 	bitmapCount = readBitmapCount();
-	Serial.print(bitmapCount);
-	Serial.println(F(" bitmap files found"));
+	Serial << bitmapCount << F(" bitmap files found") << FS(CRLF);
 	if (bitmapCount == 0) {
 		Serial.println(F("failed!"));
 		return;
 	}
 	// load first bitmap so that it is ready
 	currentBitmap = random(bitmapCount);
-	Serial.print(F("Next bitmap: "));
-	Serial.println(currentBitmap);
+	Serial << F("Next bitmap: ") << (currentBitmap) << FS(CRLF);
 	if (selectBitmap(currentBitmap)) {
 		Serial.println(bitmap.name());
 		bmpDraw(bitmap, 0, 0);
@@ -156,14 +154,9 @@ void loop() {
 
 	if (strategy == NULL) {
 		if (digitalRead(SWITCH) == 0) {
-			Serial.print(F("Starting sequence "));
-			Serial.print(currentStrategy);
-			Serial.println();
+			Serial << F("Starting sequence ") << currentStrategy << FS(CRLF);
 			// Start sequence
 			strategy = strategies[currentStrategy];
-			// next strategy is random
-			currentStrategy = random(numStrategies);
-
 			strategy->setServos(&lid, &arm);
 			strategy->setPwmPin(LED_PWM);
 			strategy->execute(false);
@@ -177,13 +170,27 @@ void loop() {
 		// Run untill finished, then stop
 		if (strategy->execute(abort) == true) {
 			strategy = NULL;
-			Serial.println();
-			Serial.print(F("Next sequence: "));
-			Serial.println(currentStrategy);
+
 			// load next bitmap
-			currentBitmap = random(bitmapCount);
-			Serial.print(F("Next bitmap: "));
-			Serial.println(currentBitmap);
+			if (bitmapCount > 1) {
+				int nextBitmap;
+				do {
+					nextBitmap = random(bitmapCount);
+				} while (nextBitmap == currentBitmap);
+				currentBitmap = nextBitmap;
+			}
+
+			// select next strategy
+			if (numStrategies > 1) {
+				int nextStrategy;
+				do {
+					nextStrategy = random(numStrategies);
+				} while (nextStrategy == currentStrategy);
+				currentStrategy = nextStrategy;
+			}
+
+			Serial << FS(CRLF) << F("Next sequence: ") << currentStrategy << FS(CRLF);
+			Serial << F("Next bitmap: ") << currentBitmap << FS(CRLF);
 			if (selectBitmap(currentBitmap)) {
 				bmpDraw(bitmap, 0, 0);
 				bitmap.close();
@@ -266,14 +273,11 @@ void bmpDraw(char *filename, uint8_t x, uint8_t y) {
 	File bmpFile;
 
 
-	Serial.println();
-	Serial.print(F("Loading image '"));
-	Serial.print(filename);
-	Serial.println('\'');
+	Serial << FS(CRLF) << F("Loading image '") << filename << '\'' << FS(CRLF);
 
 	// Open requested file on SD card
 	if ((bmpFile = SD.open(filename)) == NULL) {
-		Serial.print(F("File not found"));
+		Serial.println(F("File not found"));
 		return;
 	}
 
@@ -300,28 +304,21 @@ void bmpDraw(File &bmpFile, uint8_t x, uint8_t y) {
 
 	// Parse BMP header
 	if (read16(bmpFile) == 0x4D42) { // BMP signature
-		Serial.print(F("File size: "));
-		Serial.println(read32(bmpFile));
+		Serial << F("File size: ") << read32(bmpFile) << FS(CRLF);
 		(void) read32(bmpFile); // Read & ignore creator bytes
 		bmpImageoffset = read32(bmpFile); // Start of image data
-		Serial.print(F("Image Offset: "));
-		Serial.println(bmpImageoffset, DEC);
+		Serial << F("Image Offset: ") << bmpImageoffset << FS(CRLF);
 		// Read DIB header
-		Serial.print(F("Header size: "));
-		Serial.println(read32(bmpFile));
+		Serial << F("Header size: ") << read32(bmpFile) << FS(CRLF);
 		bmpWidth = read32(bmpFile);
 		bmpHeight = read32(bmpFile);
 		if (read16(bmpFile) == 1) { // # planes -- must be '1'
 			bmpDepth = read16(bmpFile); // bits per pixel
-			Serial.print(F("Bit Depth: "));
-			Serial.println(bmpDepth);
+			Serial << F("Bit Depth: ") << bmpDepth << FS(CRLF);
 			if ((bmpDepth == 24) && (read32(bmpFile) == 0)) { // 0 = uncompressed
 
 				goodBmp = true; // Supported BMP format -- proceed!
-				Serial.print(F("Image size: "));
-				Serial.print(bmpWidth);
-				Serial.print('x');
-				Serial.println(bmpHeight);
+				Serial << F("Image size: ") << bmpWidth << 'x' << bmpHeight << FS(CRLF);
 
 				// BMP rows are padded (if needed) to 4-byte boundary
 				rowSize = (bmpWidth * 3 + 3) & ~3;
@@ -376,9 +373,7 @@ void bmpDraw(File &bmpFile, uint8_t x, uint8_t y) {
 						tft.pushColor(tft.Color565(r, g, b));
 					} // end pixel
 				} // end scanline
-				Serial.print(F("Loaded in "));
-				Serial.print(millis() - startTime);
-				Serial.println(F(" ms"));
+				Serial << F("Loaded in ") << (millis() - startTime) << F(" ms") << FS(CRLF);
 			} // end goodBmp
 		}
 	}
